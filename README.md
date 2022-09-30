@@ -21,5 +21,13 @@
 - SW-420
 - Sim900A mini v4
 
+## Technologies
+- C++
+- HTML
+- CSS
+- Bootstrap
+- Javascript
+- IFTTT
+
 
 

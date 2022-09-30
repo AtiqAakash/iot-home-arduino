@@ -1,7 +1,7 @@
 # IOT BASED CONTROL & SECURITY SYSTEM WITH REAL-TIME MONITORING & NOTIFICATION
 
 ## Interface
-![interface 1](images/interface1.png)
+![interface 1](interface1.png)
 
 
 ## Abstract

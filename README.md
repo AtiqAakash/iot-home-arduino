@@ -29,8 +29,8 @@
 - Javascript
 - IFTTT
 
-## Won 2nd prize in ### Intra University Project Competition - 2017, UODA
-![prize](prize.jpg)
+## Won 2nd prize in ### Intra University Project Competition - 2018, UODA
+<img src="Prize.jpg" width="300" height="400" />
 
 
 

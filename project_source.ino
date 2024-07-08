@@ -1,525 +1,270 @@
+/*
+ * IoT Multipurpose Smart Home/Office/Industrial Automation/Monitoring System
+ * Developed By Atiqur Rahman Aakash
+ * University of Development Alternative
+ * Email: aakash.unipune@gmail.com
+ */
 
-/* Handy Documentation for Code Developers:
-   IoT Multipurpose Smart home/office/industrial automation/monitoring system.
-   Developed By Mohammad Atiqur Rahman Aakash
-   University of Development Alternative
-   Email: aakash.unipune@gmail.com
-*/
-#include <ESP8266WiFi.h>
-#include <DHT.h>
-#include <EEPROM.h>
-#include <SoftwareSerial.h>
-SoftwareSerial AA(D1, D2);
-/*===============================================*/
+#include <ESP8266WiFi.h>   // Library for ESP8266 WiFi module
+#include <DHT.h>           // Library for DHT temperature and humidity sensor
+#include <SoftwareSerial.h> // Library for SoftwareSerial communication
+
 // WiFi Credentials
-const char* ssid = "Home Router";
-const char* password = "homepassword";
-const char *host = "maker.ifttt.com";
-const char *motion_event = "motion";
-const char *motion_key = "v9UQmpwdiotyY_jKNy0eY";
-const char *flame_event = "flame";
-const char *flame_key = "v9UQmpwdiotyY_jKNy0eY";
-const char *temp_event = "temperature";
-const char *temp_key = "v9UQmpwdiotyY_jKNy0eY";
-const char *gas_event = "gas";
-const char *gas_key = "v9UQmpwdiotyY_jKNy0eY";
-const char *vibe_event = "vibration";
-const char *vibe_key = "v9UQmpwdiotyY_jKNy0eY";
+const char* ssid = "Home Router";    // WiFi network SSID
+const char* password = "homepassword";  // WiFi network password
 
-/*===============================================*/
-// NodeMCU pin mapping
-/*static const uint8_t D0 = 16;
-  static const uint8_t D1 = 5;
-  static const uint8_t D2 = 4;
-  static const uint8_t D3 = 0;
-  static const uint8_t D4 = 2;
-  static const uint8_t D5 = 14;
-  static const uint8_t D6 = 12;
-  static const uint8_t D7 = 13;
-  static const uint8_t D8 = 15;
-  static const uint8_t D9 = 3;
-  static const uint8_t D10 = 1; */
-/*===============================================*/
-// static IPAddress ip(192, 168, 0, 111); // static IP used for browser access:
-// static IPAddress gateway(192, 168, 0, 1);
-// static IPAddress subnet(255, 255, 255, 0);
-/*===============================================*/
-// Functions Declaration
-void motion();
-void tem(const char *e_temp);
-void motions(const char *e_motion);
-void flame(const char *e_flame);
-void gas(const char *e_gas);
-void vibe(const char *e_vibe);
-void flame_sense();
-void gas_sense();
-//long read_vib();
-void call();
-void bb();
+// IFTTT Configuration
+const char* host = "maker.ifttt.com"; // IFTTT Maker service endpoint
+const char* motion_event = "motion";  // IFTTT event name for motion detection
+const char* motion_key = "v9UQmpwdiotyY_jKNy0eY";  // IFTTT secret key for motion event
+const char* flame_event = "flame";    // IFTTT event name for flame detection
+const char* flame_key = "v9UQmpwdiotyY_jKNy0eY";  // IFTTT secret key for flame event
+const char* temp_event = "temperature";  // IFTTT event name for temperature detection
+const char* temp_key = "v9UQmpwdiotyY_jKNy0eY";  // IFTTT secret key for temperature event
+const char* gas_event = "gas";        // IFTTT event name for gas detection
+const char* gas_key = "v9UQmpwdiotyY_jKNy0eY";    // IFTTT secret key for gas event
+const char* vibe_event = "vibration";  // IFTTT event name for vibration detection
+const char* vibe_key = "v9UQmpwdiotyY_jKNy0eY";  // IFTTT secret key for vibration event
 
-/*===============================================*/
-// Definition pins
-#define DHTPIN D4 // GPIO -> 2. Can be changed to any other pins.
-#define DHTTYPE DHT22
-int red = D1;
-int green = D7;
-int pir = D8;
-int FlamePin = D3;
-int Flame = LOW;
-int gas_pin = D6;
-long duration;
-long cm;
-long inches;
-float humid;
-float temp;
-float fahr;
-float hif;
-float hic;
-float dpt;
-int gas_value;
-int pir_state = LOW;
-int pir_value = 0;
-WiFiServer server(80);
-DHT dht(DHTPIN, DHTTYPE, 30);
-/*===============================================*/
-// Setup starts here.
-/*===============================================*/
-// Setup starts here.
+// Pin Definitions
+#define DHTPIN D4     // Digital pin connected to the DHT sensor
+#define DHTTYPE DHT22 // DHT sensor type
+
+int redLED = D1;        // Red LED pin
+int greenLED = D7;      // Green LED pin
+int pirSensor = D8;     // PIR motion sensor pin
+int flameSensorPin = D3;  // Flame sensor pin
+int gasSensorPin = D6;   // Gas sensor pin
+
+// Sensor Values and States
+int flameState = LOW;    // State of the flame sensor
+int pirState = LOW;      // State of the PIR motion sensor
+int pirValue = 0;        // Value read from PIR motion sensor
+float humidity, temperature, fahrenheit, heatIndexF, heatIndexC, dewPoint;  // Variables for sensor data
+int gasValue;            // Value read from gas sensor
+
+// Server and Sensor Initialization
+WiFiServer server(80);   // Create a WiFi server instance
+DHT dht(DHTPIN, DHTTYPE, 30); // Create a DHT sensor instance
+SoftwareSerial AA(D1, D2);   // SoftwareSerial instance for SIM900 module
+
+// Function Declarations
+void detectMotion();   // Function to detect motion using PIR sensor
+void detectTemperature(); // Function to detect temperature and humidity
+void detectFlame();    // Function to detect flame using flame sensor
+void detectGas();      // Function to detect gas presence using gas sensor
+void sendIFTTTEvent(const char* event, const char* key); // Function to send event to IFTTT
+double calculateDewPoint(double celsius, double humidity); // Function to calculate dew point
+void makePhoneCall();  // Function to initiate a phone call
+void blinkLED();       // Function to blink LEDs
+
+// Setup Function
 void setup() {
-  Serial.begin(115200);
-  while (!Serial);
-  AA.begin(115200);
-  delay(1000);
-  Serial.println("_____");
+    Serial.begin(115200);   // Initialize serial communication for debugging
+    AA.begin(115200);       // Initialize SoftwareSerial for SIM900 module
+    delay(1000);            // Short delay for initialization
 
-  // Defining Pin Modes
-  pinMode(FlamePin, INPUT);
-  pinMode(gas_pin, INPUT);
-  pinMode(pir, INPUT);
-  pinMode(red, OUTPUT);
-  pinMode(green, OUTPUT);
-  digitalWrite(green, 0);
-  // Initialize DHT sensor
-  dht.begin();
+    // Initialize Pins
+    pinMode(flameSensorPin, INPUT); // Set flame sensor pin as input
+    pinMode(gasSensorPin, INPUT);   // Set gas sensor pin as input
+    pinMode(pirSensor, INPUT);      // Set PIR motion sensor pin as input
+    pinMode(redLED, OUTPUT);        // Set red LED pin as output
+    pinMode(greenLED, OUTPUT);      // Set green LED pin as output
+    digitalWrite(greenLED, LOW);    // Turn off green LED initially
 
-  // Wifi mode selection.
-  WiFi.mode(WIFI_STA); // Station mode selected.
-  // WiFi.config(ip, gateway, subnet);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print("Connecting to ");
-    Serial.print(ssid);
-    Serial.println(" Please Wait");
-    delay(10);
-  }
+    // Initialize DHT Sensor
+    dht.begin();                    // Start DHT sensor
 
-  Serial.println("Okay, I'm ON!");
-  Serial.println("WiFi Connected");
-  // Start the server.
-  server.begin();
-  Serial.println("Bingo.. Server Started");
+    // Connect to WiFi
+    WiFi.mode(WIFI_STA);            // Set WiFi mode to station (client)
+    WiFi.begin(ssid, password);     // Connect to WiFi network
+    while (WiFi.status() != WL_CONNECTED) { // Wait for WiFi connection
+        Serial.print("Connecting to ");
+        Serial.print(ssid);
+        Serial.println("... Please Wait");
+        delay(500);
+    }
+    Serial.println("WiFi Connected!");   // WiFi connected
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());     // Print IP address
+    Serial.print("MAC Address: ");
+    Serial.println(WiFi.macAddress());  // Print MAC address
 
-  //Show Ip Address on serial monitor.
-  Serial.println(WiFi.localIP());
-  Serial.print("MAC: ");
-  Serial.println(WiFi.macAddress());
-
+    // Start Server
+    server.begin();       // Start the server
+    Serial.println("Server Started"); // Print server started message
 }
 
-/*===============================================*/
-// Main function Starts.
+// Main Loop
 void loop() {
-  delay(100);
-  /*===============================================*/
-  // Motion Sensing
-  motion();
-  // Gas Sensing
-  gas_sense();
-  // Temperature Sensing
+    delay(100); // Short delay for stability
 
-  // Temperature and humidity section.
-  float humid = dht.readHumidity();
-  float temp = dht.readTemperature();
-  delay(10);
-  if (temp > 30)
-  {
-    bb();
-    Serial.println("Calling for temperature detection");
-    call();
-    tem(temp_event);
-  }
-  float fahr = dht.readTemperature(true);
-  float hif = dht.computeHeatIndex(fahr, humid); // For fahrenheight
-  float hic = dht.computeHeatIndex(temp, humid, false); // For Celcius
-  float dpt = dewPointFast(temp, humid);
+    detectMotion();       // Check for motion detection
+    detectGas();          // Check for gas detection
+    detectTemperature();  // Check for temperature and humidity
+    detectFlame();        // Check for flame detection
 
-  // DHT availability.
-  if (isnan(humid) || isnan(temp) || isnan(fahr))
-  {
-    Serial.println(" DHT not connected");
-    return;
-  }
-  Serial.print("Temperature :");
-  Serial.print(temp);
-  Serial.print("°C");
-  Serial.print("|| Humidity ");
-  Serial.print(humid);
-  Serial.println("%");
-  delay(1000);
-  //Flame Sensing
-  flame_sense();
-  // Checking if connected or not.
-  WiFiClient client = server.available();
-  if (!client)
-    return;
-
-
-  /*===============================================*/
-  // Page Development.
-  String html = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n";
-  html += "<!DOCTYPE html>";
-  html += "<head><meta charset=\"UTF-8\">";
-  html += "<meta http-equiv=\"refresh\" content=\"30\">";
-  html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
-  html += "<script src=\"https://code.jquery.com/jquery-2.1.3.min.js\"></script>";
-  html += "<link rel=\"icon\" type=\"image/x-icon\" href = \"https://www.ald.softbankrobotics.com/sites/aldebaran/themes/aldebaran/favicon.ico\">";
-  html += "<title>Aakash-IOT</title>";
-  html += "<link rel=\"stylesheet\" href = \"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css\">";
-  html += "<script src = \"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js\"></script>";
-  html += "</head><body>";
-  html += "<div class='container'>";
-  html += "<div class='progress'>";
-  html += "<div class='progress-bar progress-bar-striped active' role='progressbar' aria-valuenow='' aria-valuemin='0' aria-valuemax='100' style='width:100%'>";
-  html += "<MARQUEE BEHAVIOR=ALTERNATE>Developped By Aakash</MARQUEE><br><br>";
-  html += "</div></div></div>";
-  html += "<div class=\"container\">";
-  html += "<div class=\"panel panel-default\" margin:25px>";
-  html += "<div class=\"panel-heading\">";
-  html += "<div class=\"col-md-6\"><input class=\"btn btn-block btm-md btn-success\" type=\"button\" value=\"Go To Feedback Panel\" onclick=location.href=\"http://192.168.43.217\" ></div><br><br>";
-  html += "<div class=\"container\">";
-  html += "<div class=\"panel panel-default\" margin:5px>";
-  html += "<div class=\"panel-heading\">";
-  html += "<H2 style=\"font-family:robot; color:#ed4917\"><center>WEATHER INFO</center></H2>";
-  html += "<div class=\"panel-body\" style=\"background-color: #518DC1\">";
-  html += "<pre>";
-  html += "Humidity : ";
-  html += humid;
-  html += " %\n";
-  html += "Temperature : ";
-  html += temp;
-  html += " °C\n";
-  html += "Temperature : ";
-  html += fahr;
-  html += " °F\n";
-  html += "Heat Index : ";
-  html += hic;
-  html += " °C || ";
-  html += hif;
-  html += " °F\n";
-  html += "Dew PointFast : ";
-  html += dpt;
-  html += " °C\n<br>";
-  html += "</pre></div></div></div></div>";
-  html += "</body></html>";
-  client.print(html); /* Print out the page */
-  delay(1);
-  Serial.println("Running");
-  client.stop();
-
+    // Check for client connection
+    WiFiClient client = server.available();
+    if (client) {
+        String html = generateHTMLPage(); // Generate HTML page
+        client.print(html); // Send HTML page to client
+        delay(1); // Short delay
+        client.stop(); // Disconnect client
+    }
 }
 
-void tem(const char *e_temp) {
-  WiFiClient client;
-  int httpPort = 80;
-  if (!client.connect(host, httpPort))
-  {
-    Serial.println("Connection failed");
-    return;
-  }
-
-  // We now create a URI for the request
-  String url = "/trigger/";
-  url += temp_event;
-  url += "/with/key/";
-  url += temp_key;
-
-  Serial.print("Requesting URL: ");
-  Serial.println(url);
-
-  // This will send the request to the server
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" +
-               "Connection: close\r\n\r\n");
-
-  // Read all the lines of the reply from server and print them to Serial,
-  // the connection will close when the server has sent all the data.
-  while (client.connected())
-  {
-    if (client.available())
-    {
-      String line = client.readStringUntil('\r');
-      Serial.print(line);
+// Motion Detection
+void detectMotion() {
+    pirValue = digitalRead(pirSensor); // Read PIR motion sensor value
+    if (pirValue == HIGH) { // If motion detected
+        if (pirState == LOW) { // Check if motion state changed
+            Serial.println("Motion Detected!"); // Print motion detected message
+            blinkLED(); // Blink LEDs
+            makePhoneCall(); // Initiate phone call
+            sendIFTTTEvent(motion_event, motion_key); // Send IFTTT event
+            pirState = HIGH; // Update motion state
+        }
+    } else { // If no motion detected
+        digitalWrite(greenLED, LOW); // Turn off green LED
+        analogWrite(redLED, LOW);    // Turn off red LED
+        if (pirState == HIGH) { // Check if motion state changed
+            Serial.println("No Motion Detected"); // Print no motion message
+            pirState = LOW; // Update motion state
+        }
     }
-    else
-    {
-      // No data yet, wait a bit
-      delay(50);
-    }
-  }
 }
 
-void motion() {
-  pir_value = digitalRead(pir); // read sensor pir_valueue
-  if (pir_value == HIGH)
-  { // check if the sensor is HIGH
-    if (pir_state == LOW)
-    {
-      Serial.println("Motion detected!");
-      bb();
-      Serial.println("Calling for motion detection");
-      call();
-      motions(motion_event);
-      pir_state = HIGH; // update variable pir_state to HIGH
+// Temperature and Humidity Detection
+void detectTemperature() {
+    humidity = dht.readHumidity(); // Read humidity from DHT sensor
+    temperature = dht.readTemperature(); // Read temperature from DHT sensor
+    fahrenheit = dht.readTemperature(true); // Read temperature in Fahrenheit
+    heatIndexC = dht.computeHeatIndex(temperature, humidity, false); // Calculate heat index in Celsius
+    heatIndexF = dht.computeHeatIndex(fahrenheit, humidity); // Calculate heat index in Fahrenheit
+    dewPoint = calculateDewPoint(temperature, humidity); // Calculate dew point
+
+    if (isnan(humidity) || isnan(temperature) || isnan(fahrenheit)) { // Check for DHT sensor error
+        Serial.println("DHT Sensor Error!"); // Print sensor error message
+        return; // Exit function
     }
-  }
-  else
-  {
-    analogWrite(red, 0);
-    digitalWrite(green, 0);
-    if (pir_state == HIGH)
-    {
-      Serial.println("No Motion Detected!");
-      pir_state = LOW; // update variable pir_state to LOW
+
+    Serial.print("Temperature: ");
+    Serial.print(temperature);
+    Serial.print("°C | Humidity: ");
+    Serial.print(humidity);
+    Serial.println("%");
+
+    if (temperature > 30) { // If temperature exceeds threshold
+        blinkLED(); // Blink LEDs
+        makePhoneCall(); // Initiate phone call
+        sendIFTTTEvent(temp_event, temp_key); // Send IFTTT event
     }
-  }
+    delay(1000); // Short delay
 }
 
-// reference: http://en.wikipedia.org/wiki/Dew_point
-double dewPointFast(double celsius, double humidity) {
-  double a = 17.271;
-  double b = 237.7;
-  double t = (a * celsius) / (b + celsius) + log(humidity * 0.01);
-  double Td = (b * t) / (a - t);
-  return Td;
-}
-// Flame sensing function
-void flame_sense() {
-  Flame = digitalRead(FlamePin);
-  if (Flame == HIGH)
-    Serial.println("No Flame");
-  else
-  {
-    bb();
-    Serial.println("Fire!!!!");
-    Serial.println("Calling for fire detection");
-    call();
-    flame(flame_event);
-  }
-  delay(1000);
-}
-// Gas sensing function
-void gas_sense() {
-  int gas_value = digitalRead(gas_pin);
-  Serial.println(gas_value);
-  if (gas_value > 0)
-  {
-    bb();
-    Serial.println("Gas Available");
-    Serial.println("Calling for gas detection");
-    call();
-    gas(gas_event);
-  }
-  else
-    Serial.println("Gas Not Available");
-  delay(1000);
-}
-
-
-
-
-void motions(const char *e_motion) {
-
-  WiFiClient client;
-  int httpPort = 80;
-  if (!client.connect(host, httpPort))
-  {
-    Serial.println("Connection failed");
-    return;
-  }
-
-  // We now create a URI for the request
-  String url = "/trigger/";
-  url += motion_event;
-  url += "/with/key/";
-  url += motion_key;
-
-  Serial.print("Requesting URL: ");
-  Serial.println(url);
-
-  // This will send the request to the server
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" +
-               "Connection: close\r\n\r\n");
-
-  // Read all the lines of the reply from server and print them to Serial,
-  // the connection will close when the server has sent all the data.
-  while (client.connected())
-  {
-    if (client.available())
-    {
-      String line = client.readStringUntil('\r');
-      Serial.print(line);
+// Flame Detection
+void detectFlame() {
+    flameState = digitalRead(flameSensorPin); // Read flame sensor state
+    if (flameState == HIGH) { // If no flame detected
+        Serial.println("No Flame Detected"); // Print no flame message
+    } else { // If flame detected
+        Serial.println("Flame Detected!"); // Print flame detected message
+        blinkLED(); // Blink LEDs
+        makePhoneCall(); // Initiate phone call
+        sendIFTTTEvent(flame_event, flame_key); // Send IFTTT event
     }
-    else
-    {
-      // No data yet, wait a bit
-      delay(50);
-    }
-  }
+    delay(1000); // Short delay
 }
 
-void flame(const char *e_flame) {
-  WiFiClient client;
-  int httpPort = 80;
-  if (!client.connect(host, httpPort))
-  {
-    Serial.println("Connection failed");
-    return;
-  }
-
-  // We now create a URI for the request
-  String url = "/trigger/";
-  url += flame_event;
-  url += "/with/key/";
-  url += flame_key;
-
-  Serial.print("Requesting URL: ");
-  Serial.println(url);
-  // This will send the request to the server
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" +
-               "Connection: close\r\n\r\n");
-
-  // Read all the lines of the reply from server and print them to Serial,
-  // the connection will close when the server has sent all the data.
-  while (client.connected())
-  {
-    if (client.available())
-    {
-      String line = client.readStringUntil('\r');
-      Serial.print(line);
+// Gas Detection
+void detectGas() {
+    gasValue = digitalRead(gasSensorPin); // Read gas sensor value
+    Serial.println(gasValue); // Print gas sensor value
+    if (gasValue > 0) { // If gas detected
+        Serial.println("Gas Detected!"); // Print gas detected message
+        blinkLED(); // Blink LEDs
+        makePhoneCall(); // Initiate phone call
+        sendIFTTTEvent(gas_event, gas_key); // Send IFTTT event
+    } else { // If no gas detected
+        Serial.println("No Gas Detected"); // Print no gas message
     }
-    else
-    {
-      // No data yet, wait a bit
-      delay(50);
-    }
-  }
+    delay(1000); // Short delay
 }
 
-void gas(const char *e_gas) {
-  WiFiClient client;
-  int httpPort = 80;
-  if (!client.connect(host, httpPort))
-  {
-    Serial.println("Connection failed");
-    return;
-  }
+// Function to send event to IFTTT
+void sendIFTTTEvent(const char* event, const char* key) {
+    String url = "/trigger/"; // IFTTT endpoint URL
+    url += event; // Append event name
+    url += "/with/key/"; // Append secret key
+    url += key; // Append secret key
 
-  // We now create a URI for the request
-  String url = "/trigger/";
-  url += gas_event;
-  url += "/with/key/";
-  url += gas_key;
-
-  Serial.print("Requesting URL: ");
-  Serial.println(url);
-
-  // This will send the request to the server
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" +
-               "Connection: close\r\n\r\n");
-
-  // Read all the lines of the reply from server and print them to Serial,
-  // the connection will close when the server has sent all the data.
-  while (client.connected())
-  {
-    if (client.available())
-    {
-      String line = client.readStringUntil('\r');
-      Serial.print(line);
+    // HTTP request to IFTTT
+    Serial.print("Connecting to IFTTT... ");
+    WiFiClient client;
+    if (client.connect(host, 80)) { // If connected to IFTTT server
+        Serial.println("Connected!");
+        client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+                     "Host: " + host + "\r\n" +
+                     "Connection: close\r\n\r\n");
+        delay(1000); // Short delay
+        Serial.println("IFTTT Event Sent!");
+    } else { // If connection to IFTTT failed
+        Serial.println("Failed to connect to IFTTT");
     }
-    else
-    {
-      // No data yet, wait a bit
-      delay(50);
-    }
-  }
 }
 
-void vibe(const char *e_vibe) {
-  WiFiClient client;
-  int httpPort = 80;
-  if (!client.connect(host, httpPort))
-  {
-    Serial.println("Connection failed");
-    return;
-  }
+// Function to calculate dew point
+double calculateDewPoint(double celsius, double humidity) {
+    double A0 = 373.15 / (273.15 + celsius);
+    double SUM = -7.90298 * (A0 - 1);
+    SUM += 5.02808 * log10(A0);
+    SUM += -1.3816e-7 * (pow(10, (11.344 * (1 - 1 / A0))) - 1);
+    SUM += 8.1328e-3 * (pow(10, (-3.49149 * (A0 - 1))) - 1);
+    SUM += log10(1013.246);
 
-  // We now create a URI for the request
-  String url = "/trigger/";
-  url += vibe_event;
-  url += "/with/key/";
-  url += vibe_key;
-
-  Serial.print("Requesting URL: ");
-  Serial.println(url);
-
-  // This will send the request to the server
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" +
-               "Connection: close\r\n\r\n");
-
-  // Read all the lines of the reply from server and print them to Serial,
-  // the connection will close when the server has sent all the data.
-  while (client.connected())
-  {
-    if (client.available())
-    {
-      String line = client.readStringUntil('\r');
-      Serial.print(line);
-    }
-    else
-    {
-      // No data yet, wait a bit
-      delay(50);
-    }
-  }
+    double VP = pow(10, SUM - 3) * humidity;
+    double Td = log(VP / 0.61078);
+    return (241.88 * Td) / (17.558 - Td);
 }
 
-void call() {
-  Serial.println();
-  Serial.println("Making A Call");
-  AA.println("AT");
-  delay(1000);
-  AA.println("ATD01521207874");
-  delay(20000);
-  AA.println("ATH");
+// Function to initiate a phone call
+void makePhoneCall() {
+    AA.println("ATD +88 01711234567;"); // Replace with your phone number
+    delay(30000); // Wait for 30 seconds (adjust as necessary)
+    AA.println("ATH"); // Hang up call
 }
 
-void bb() {
-  int i;
-  digitalWrite(green, 1);
-  for (i = 0; i < 20; i++) {
-    analogWrite(red, 500);
-    delay(400);
-    analogWrite(red, 0);
-    delay(400);
-  }
+// Function to blink LEDs
+void blinkLED() {
+    digitalWrite(greenLED, HIGH); // Turn on green LED
+    analogWrite(redLED, 512);     // Turn on red LED (adjust brightness as necessary)
+    delay(500);                   // Wait for 0.5 seconds
+    digitalWrite(greenLED, LOW);  // Turn off green LED
+    analogWrite(redLED, LOW);     // Turn off red LED
 }
 
-
-
-
-
+// Function to generate HTML page
+String generateHTMLPage() {
+    String html = "<html><body>";
+    html += "<h1>IoT Monitoring System</h1>";
+    html += "<p>Current Status:</p>";
+    html += "<ul>";
+    html += "<li>Motion Sensor: ";
+    html += pirState == HIGH ? "Motion Detected" : "No Motion Detected";
+    html += "</li>";
+    html += "<li>Temperature: ";
+    html += String(temperature);
+    html += " °C</li>";
+    html += "<li>Humidity: ";
+    html += String(humidity);
+    html += " %</li>";
+    html += "<li>Flame Sensor: ";
+    html += flameState == HIGH ? "No Flame Detected" : "Flame Detected";
+    html += "</li>";
+    html += "<li>Gas Sensor: ";
+    html += gasValue > 0 ? "Gas Detected" : "No Gas Detected";
+    html += "</li>";
+    html += "</ul></body></html>";
+    return html;
+}
